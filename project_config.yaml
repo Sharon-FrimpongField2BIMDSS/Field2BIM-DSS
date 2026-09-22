@@ -1,0 +1,132 @@
+# ═══════════════════════════════════════════════════════════════════════
+# ARM 0 — Field2BIM DSS Project Configuration
+# ═══════════════════════════════════════════════════════════════════════
+# STATIC: set once per project. Never changes between pipeline runs.
+# DYNAMIC: only --input-ifc path changes at runtime.
+#
+# SOURCES OF INFORMATION IN THIS FILE:
+#   Building metadata    → facility manager / BIM authoring team
+#   MCDA weights         → Delphi elicitation or normative (Guitouni & Martel 1998)
+#   LCA parameters       → EN 15978:2011; EU Taxonomy 2021/2139
+#   Triangulation params → EQ-T4 (Denzin 1978; Zhang et al. 2022)
+#   Econometrics         → EIB economic appraisal; EN ISO 15686-5; Eurostat
+#   FIX-A parameters     → BS 6187:2011; EC2 EN1992-1-1
+#   IDS schema           → BIM manager / information manager per ISO 19650-2
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── Workbook path (from BIM team) ─────────────────────────────────────
+dss_workbook: Field2BIM_DSS_Structural_Scope_v1.xlsx
+
+# ── Field data inputs (from survey team — static per campaign) ────────
+sensor_evidence_csv: Inputs/sensor_evidence.csv
+binding_ledger_csv: Inputs/binding_ledger.csv
+model_register_csv: Inputs/model_register.csv
+
+# ── Output root ────────────────────────────────────────────────────────
+output_root: outputs
+economic_inputs_file: economic_inputs.yaml
+unified_economic_mcda: true
+dss_calculation_mode: api_first
+workbook_fallback_enabled: true
+
+# ── Execution mode ─────────────────────────────────────────────────────
+# deployment keeps normative weights explicit and reports missing Delphi
+# evidence as a warning; thesis_final requires the evidence file.
+run_mode: deployment
+
+# ── Building metadata (from facility manager / BIM model) ─────────────
+building_name: Gymnasium_Bolzano
+pre_1985: false          # true = C_chem HALT gate active (CPR Art.31)
+                          # false = building confirmed post-1985 or surveyed
+gfa_m2: 1250.0           # from IFC IfcBuilding.GrossFloorArea
+rsp_years: 30            # EN 15978:2011 §5.2 reference study period
+
+# ── LCA scenario alpha fate-factors (structural engineer / EN 15978) ──
+alpha_REN: 0.40          # 60% structure retained — EN 15978 Module C
+alpha_DIS: 0.90          # selective disassembly — EN 15978 Module C
+alpha_DEM: 1.00          # full demolition — EN 15978 Module C
+
+# ── MCDA weights EQ-28 (Delphi or normative — sum MUST equal 1.00) ────
+w_LCA: 0.20
+w_CIRC: 0.20
+w_SI: 0.20
+w_PERF: 0.10
+w_CDW: 0.05
+w_SV: 0.05
+w_ECON: 0.20
+# sum: 1.00; economic criterion is included in unified mode
+
+# ── FIX-A: Scenario structural differentiation (BS 6187; EC2) ─────────
+dis_disassembly_gate: 6     # DisassemblyScore threshold for DIS (0-10 scale)
+dis_circ_penalty: 0.40      # CIRC_e multiplier if DS < gate
+ren_svc_life_factors:       # SI_e multiplier by condition grade (EC2 EN1992-1-1)
+  excellent: 1.20           # condition >= 8.0/10
+  good:      1.10           # condition 6.0–7.9
+  fair:      1.00           # condition 4.0–5.9
+  poor:      0.90           # condition 2.0–3.9
+  critical:  0.75           # condition < 2.0
+
+# ── Triangulation EQ-T4 (Denzin 1978; Zhang et al. 2022) ─────────────
+lambda_penalty:    2.0    # exponential disagreement penalty (normative)
+tau_conflict:      0.15   # ConflictFlag threshold EQ-T5 (normative)
+gamma_review:      0.60   # ReviewFlag threshold EQ-T6 (normative)
+
+# ── Econometrics (EIB; EN ISO 15686-5; Eurostat) ─────────────────────
+discount_rate:     0.035  # public sector social discount rate 0–30yr horizon
+carbon_price_base: 65.0   # EUR/tCO2e EU ETS current
+
+# ── BAU maintenance escalation ───────────────────────────────────────
+bau_maintenance_escalation: 0.03
+
+# ── FIX-F: European shadow-carbon valuation ──────────────────────────
+shadow_carbon_price_eur: 250.0
+
+# ── FIX-G: Rebound factors (VBN AAU 2022; ecoinvent 3.9) ─────────────
+rebound_steel_scrap: 0.20
+rebound_rca:         0.35
+
+# ── IDS schema (BIM manager / information manager) ────────────────────
+ids_schema: schemas/field2bim_structural.ids
+
+# ── Excel recalculation (vendor-neutral options only) ─────────────────
+# "python"      → dss_equations.py — RECOMMENDED, fully headless
+# "openpyxl"    → writes seed cells only, open manually to recalculate
+# "libreoffice" → headless LibreOffice recalculation
+# "manual"      → pipeline pauses for user action
+excel_recalc_strategy: python
+
+# ── IFC output suffix ────────────────────────────────────────────────
+ifc_output_suffix: _Field2BIM_DSS_Annotated
+
+# ── Writeback guard (CRITICAL — do not disable) ───────────────────────
+# Prevents annotated IFC from re-entering pipeline as input.
+# Enrichment stops at apply_exchange_to_ifc_v2.py. Terminal output only.
+writeback_guard: true
+
+# ── API-based LCA (declared by Structural Engineer in ARM 0) ──────────
+# ARM 0 declares LEVEL and STANDARD — never names a specific API
+# ARM 2 (lca_api_resolver.py) selects the engine that satisfies this tier
+lca_data_tier: 2             # 1=generic/ICE, 2=EPD/ÖKOBAUDAT, 3=measured
+lca_preferred_api: oekobaudat # "oekobaudat" (EN 15804+A2) or "kbob" (SIA 2032)
+lca_db_standard: EN15804_A2   # required EPD standard
+lca_scope_modules: [A1-A3, C1-C4, D]  # EN 15978 modules declared
+
+# Online ÖKOBAUDAT API access.
+okobaudat_source: api
+okobaudat_compliance: EN15804_A2
+
+# ── Delphi weight elicitation (Research Team — ARM 0 C8) ─────────────
+delphi_evidence_csv: Inputs/delphi_weights.csv  # path to Delphi survey CSV
+                                                  # set to null if not conducted
+delphi_n_experts_required: 5  # minimum for validity (Linstone & Turoff 1975)
+
+# ── SI_s feedback trigger threshold (Structural Engineer) ─────────────
+si_review_threshold: 0.60  # SI_s below this → BCF issue + redesign required
+
+# ── Social value sub-weights (Research Team / Delphi) ────────────────
+sv_heritage_weight:       0.40  # ISO 21929-1 heritage continuity
+sv_accessibility_weight:  0.35  # ISO 21929-1 service accessibility
+sv_employment_weight:     0.25  # ISO 21929-1 local employment
+
+# ── Redesign route (BIM Manager — ARM 0 C10) ─────────────────────────
+redesign_route: "structural_engineer_review → bim_remodel → arm0_rerun"
